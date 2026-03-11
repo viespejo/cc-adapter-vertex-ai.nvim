@@ -10,12 +10,26 @@ adapter.formatted_name = "Vertex AI (Anthropic)"
 adapter.url =
   "https://aiplatform.googleapis.com/v1/projects/${project_id}/locations/${region}/publishers/anthropic/models/${model}"
 
--- 2. Overwrite environment variables (removing api_key)
+-- 2.a Overwrite environment variables (removing api_key)
 adapter.env = {
   project_id = "YOUR_PROJECT_ID",
   region = "global",
   access_token = "", -- Resolved during setup
   model = "", -- Resolved during setup
+}
+
+-- 2.b Overwrite available_tools
+adapter.available_tools["web_search"] = {
+  description = "The web search tool gives Claude direct access to real-time web content, allowing it to answer questions with up-to-date information beyond its knowledge cutoff",
+  ---@param self CodeCompanion.HTTPAdapter.Anthropic
+  ---@param tools table The transformed tools table
+  callback = function(self, tools)
+    table.insert(tools, {
+      type = "web_search_20260209",
+      name = "web_search",
+      max_uses = 5,
+    })
+  end,
 }
 
 -- 3. Overwrite headers

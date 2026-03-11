@@ -18,14 +18,12 @@ adapter.env = {
   model = "", -- Resolved during setup
 }
 
--- Deshabilitar las herramientas nativas en beta de Anthropic (usaremos las estándar de CodeCompanion)
-adapter.available_tools = {}
-
 -- 3. Overwrite headers
 -- Vertex uses Bearer Token and does not use 'x-api-key'.
 adapter.headers = {
   ["Authorization"] = "Bearer ${access_token}",
   ["content-type"] = "application/json",
+  ["anthropic-beta"] = "",
 }
 
 -- 4. Intercept setup for Google authentication
@@ -82,6 +80,35 @@ adapter.handlers.form_parameters = function(self, params, messages)
   p.anthropic_version = "vertex-2023-10-16"
 
   return p
+end
+
+-- 6. Inject anthropic_beta as body parameter
+---@param self CodeCompanion.HTTPAdapter
+---@param body table The data returned from the fetch
+---@return table{status: string, content: string}|nil
+adapter.handlers.set_body = function(self, body)
+  -- here we move beta header to body as well, since Vertex AI does not support custom headers
+  local anthropic_beta = self.headers["anthropic-beta"]
+  self.headers["anthropic-beta"] = nil
+
+  if anthropic_beta and anthropic_beta ~= "" then
+    local beta_list = {}
+    -- pattern %g+ captures sequences of non-whitespace characters, effectively splitting by commas and ignoring empty entries
+    for beta in string.gmatch(anthropic_beta, "([^,]+)") do
+      -- direct trim and content check
+      local clean_beta = beta:match("^%s*(.-)%s*$")
+      if clean_beta ~= "" then
+        table.insert(beta_list, clean_beta)
+      end
+    end
+
+    -- only assign if there are valid beta tools, Vertex prefers not to receive the field if it's empty
+    if #beta_list > 0 then
+      body.anthropic_beta = beta_list
+    end
+  end
+
+  return body
 end
 
 -- 7. Replace models with exact Google Cloud nomenclature
